@@ -1,6 +1,7 @@
 'use strict';
 module.exports = function (grunt) {
 	var exec = require('child_process').exec;
+	var spawn = require('child_process').spawn;
 	var _ = grunt.util._;
 
 	grunt.registerMultiTask('shell', 'Run shell commands', function () {
@@ -8,7 +9,8 @@ module.exports = function (grunt) {
 		var options = this.options({
 			stdout: false,
 			stderr: false,
-			failOnError: false
+			failOnError: false,
+			type: 'exec'
 		});
 		var cmd = this.data.command;
 
@@ -18,16 +20,34 @@ module.exports = function (grunt) {
 
 		cmd = grunt.template.process(_.isFunction(cmd) ? cmd.call(grunt) : cmd);
 
-		var cp = exec(cmd, options.execOptions, function (err, stdout, stderr) {
-			if (_.isFunction(options.callback)) {
-				options.callback.call(this, err, stdout, stderr, cb);
-			} else {
-				if (err && options.failOnError) {
-					grunt.warn(err);
-				}
-				cb();
-			}
-		});
+		var cp;
+		switch (options.type) {
+			case 'exec':
+				cp = exec(cmd, options.execOptions, function (err, stdout, stderr) {
+					if (_.isFunction(options.callback)) {
+						options.callback.call(this, err, stdout, stderr, cb);
+					} else {
+						if (err && options.failOnError) {
+							grunt.warn(err);
+						}
+						cb();
+					}
+				});		
+				break;
+			case 'spawn':
+				cp = spawn(cmd, options.spawnOptions);
+				ls.on('error', function (err) {
+					if (options.failOnError) {
+						grunt.warn(err);
+					}
+					cb();
+				});
+				ls.on('close', function (code) {
+					cb();
+				});
+				break;
+
+		}
 
 		grunt.verbose.writeln('Command:', cmd.yellow);
 		grunt.verbose.writeflags(options, 'Options');
